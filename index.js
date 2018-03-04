@@ -2,17 +2,13 @@ const ethWallet = require('ethereumjs-wallet')
 const ethTx = require('ethereumjs-tx')
 const bip39 = require('bip39')
 const hdkey = require('ethereumjs-wallet/hdkey')
+const Web3 = require('web3')
+const ethUtil = require('ethereumjs-util')
 
 //const mnemonic = bip39.generateMnemonic()
 const mnemonic = "time unhappy fade domain stairs tape roof nephew walk erase magnet main"
 console.log('['+mnemonic+']')
 
-/*var wallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic)).getWallet()
-console.log(wallet.toV3String('2006'))
-var wallet = hdkey.fromMasterSeed(bip39.mnemonicToSeedHex(mnemonic)).getWallet()
-console.log(wallet.toV3String('2006'))
-var wallet = hdkey.fromMasterSeed(mnemonic).getWallet()
-console.log(wallet.toV3String('2006'))*/
 
 var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
 
@@ -28,90 +24,54 @@ console.log(v3)
 
 var v3Wallet = ethWallet.fromV3(v3, '2006')
 var privateKey = v3Wallet.getPrivateKey()
+var address = v3Wallet.getAddressString()
 
-var tx = new ethTx(null, 1)
 
-console.log('-')
-console.log('-')
-console.log('-')
-console.log('-')
+var web3 = new Web3(new Web3.providers.HttpProvider("https://ropsten.infura.io/metamask"))
 
-tx.nonce = 0
-tx.gasPrice = 100
-tx.gasLimit = 1000
-tx.value = 0
 
+const txParams = {
+  nonce: ethUtil.addHexPrefix('0'.toString('hex')),
+  gasPrice: ethUtil.addHexPrefix('5'.toString('hex')),
+  gasLimit: ethUtil.addHexPrefix('21000'.toString('hex')),
+  to: '0x0000000000000000000000000000000000000000',
+  value: ethUtil.addHexPrefix('0.001'.toString('hex')),
+  data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057',
+  // EIP 155 chainId - mainnet: 1, ropsten: 3
+  chainId: 3
+}
+console.log(txParams)
+
+const tx = new ethTx(txParams)
 tx.sign(privateKey)
-// We have a signed transaction, Now for it to be fully fundable the account that we signed
-// it with needs to have a certain amount of wei in to. To see how much this
-// account needs we can use the getUpfrontCost() method.
-var feeCost = tx.getUpfrontCost()
-tx.gas = feeCost
-console.log('Total Amount of wei needed:' + feeCost.toString())
+const serializedTx = tx.serialize()
 
-// if your wondering how that is caculated it is
-// bytes(data length) * 5
-// + 500 Default transaction fee
-// + gasAmount * gasPrice
 
-// lets serialize the transaction
+console.log('Senders Address: ' + tx.getSenderAddress().toString('hex'))
 
-console.log('---Serialized TX----')
-console.log(tx.serialize().toString('hex'))
-console.log('--------------------')
-
-var tx2 = new ethTx(tx)
-
-// Note rlp.decode will actully produce an array of buffers `new Transaction` will
-// take either an array of buffers or an array of hex strings.
-// So assuming that you were able to parse the tranaction, we will now get the sender's
-// address
-
-console.log('Senders Address: ' + tx2.getSenderAddress().toString('hex'))
-
-// Cool now we know who sent the tx! Lets verfy the signature to make sure it was not
-// some poser.
-
-if (tx2.verifySignature()) {
+if (tx.verifySignature()) {
   console.log('Signature Checks out!')
 }
 
-// Now that we have the serialized transaction we can get AlethZero to except by
-// selecting debug>inject transaction and pasting the transaction serialization and
-// it should show up in pending transaction.
+console.log(address)
+web3.eth.getTransactionCount(address)
+.then(function(count) {
+  console.log(count)
+})
+.catch(function(err) {
+  console.log(err)
+})
 
-// Parsing & Validating transactions
-// If you have a transaction that you want to verify you can parse it. If you got
-// it directly from the network it will be rlp encoded. You can decode you the rlp
-// module. After that you should have something like
-var rawTx = [
-  '0x00',
-  '0x09184e72a000',
-  '0x2710',
-  '0x0000000000000000000000000000000000000000',
-  '0x00',
-  '0x7f7465737432000000000000000000000000000000000000000000000000000000600057',
-  '0x1c',
-  '0x5e1d3a76fbf824220eafc8c79ad578ad2b67d01b0c2425eb1f1347e8f50882ab',
-  '0x5bd428537f05f9830e93792f90ea6a3e2d1ee84952dd96edbae9f658f831ab13'
-]
+console.log('0x' + serializedTx.toString('hex'))
+web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex'))
+.then(function(hash) {
+  console.log(hash)
+})
+.catch(function(err) {
+  console.log(err)
+})
 
-var tx2 = new ethTx(rawTx)
-
-// Note rlp.decode will actully produce an array of buffers `new Transaction` will
-// take either an array of buffers or an array of hex strings.
-// So assuming that you were able to parse the tranaction, we will now get the sender's
-// address
-
-console.log('Senders Address: ' + tx2.getSenderAddress().toString('hex'))
-
-// Cool now we know who sent the tx! Lets verfy the signature to make sure it was not
-// some poser.
-
-if (tx2.verifySignature()) {
-  console.log('Signature Checks out!')
-}
-
-// And hopefully its verified. For the transaction to be totally valid we would
-// also need to check the account of the sender and see if they have at least
-// `TotalFee`.
+/*web3.eth.sendRawTransaction('0x' + tx.serialize().toString('hex'), function(err, hash) {
+  if (!err)
+    console.log(hash); // "0x7f9fade1c0d57a7af66ab4ead79fade1c0d57a7af66ab4ead7c2c2eb7b11a91385"
+});*/
